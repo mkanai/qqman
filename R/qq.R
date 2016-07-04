@@ -14,17 +14,20 @@
 #' 
 #' @export
 
-qq = function(pvector, ...) {
+qq = function(pvector, logp = TRUE, ...) {
     
     # Check for sensible input
     if (!is.numeric(pvector)) stop("Input must be numeric.")
     
     # limit to not missing, not nan, not null, not infinite, between 0 and 1
-    pvector <- pvector[!is.na(pvector) & !is.nan(pvector) & !is.null(pvector) & is.finite(pvector) & pvector<1 & pvector>0]
+    pvector <- pvector[!is.na(pvector) & !is.nan(pvector) & !is.null(pvector) & is.finite(pvector)]
+    if (logp) {
+        pvector <- -log10(pvector[pvector<1 & pvector>0])
+    }
     
     # Observed and expected
-    o = -log10(sort(pvector,decreasing=FALSE))
-    e = -log10( ppoints(length(pvector) ))
+    o = sort(pvector, decreasing = T)
+    e = -log10(ppoints(length(pvector)))
     
     
 #     # The old way
