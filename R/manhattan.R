@@ -43,8 +43,11 @@
 
 manhattan <- function(x, chr="CHR", bp="BP", p="P", snp="SNP", 
                       col=c("gray10", "gray60"), chrlabs=NULL,
-                      suggestiveline=-log10(1e-5), genomewideline=-log10(5e-8), 
-                      highlight=NULL, logp=TRUE, annotatePval = NULL, annotateTop = TRUE, ...) {
+                      suggestiveline=-log10(1e-5), suggestiveline_col="blue", suggestiveline_lty=1,
+                      genomewideline=-log10(5e-8), genomewideline_col="red", genomewideline_lty=1,
+                      highlight=NULL, highlight_col=c("green3"),
+                      axis.y.break=NULL,
+                      logp=TRUE, annotatePval = NULL, annotateTop = TRUE, ...) {
 
     # Not sure why, but package check will warn without this.
     CHR=BP=P=index=NULL
@@ -135,16 +138,37 @@ manhattan <- function(x, chr="CHR", bp="BP", p="P", snp="SNP",
     # plot(NULL, xaxt='n', bty='n', xaxs='i', yaxs='i', xlim=c(xmin,xmax), ylim=c(ymin,ymax),
     #      xlab=xlabel, ylab=expression(-log[10](italic(p))), las=1, pch=20, ...)
 
-    
     # The new way to initialize the plot.
     ## See http://stackoverflow.com/q/23922130/654296
     ## First, define your default arguments
     def_args <- list(xaxt='n', bty='n', xaxs='i', yaxs='i', las=1, pch=20,
                      xlim=c(xmin,xmax), ylim=c(0,ceiling(max(d$logp))),
-                     xlab=xlabel, ylab=expression(-log[10](italic(p))))
+                     xlab=xlabel, ylab=expression(-log[10](italic(P))))
     ## Next, get a list of ... arguments
     #dotargs <- as.list(match.call())[-1L]
     dotargs <- list(...)
+
+    if (!is.null(axis.y.break)) {
+      lower <- axis.y.break[1]
+      upper <- axis.y.break[2]
+      size <- upper - lower
+      d = subset(d, logp <= lower | upper <= logp)
+      d$logp <- ifelse(d$logp > lower, d$logp-size, d$logp)
+      yat <- pretty(d$logp)
+      ylab <- ifelse(yat > lower, yat+size, yat)
+      dotargs = c(dotargs, list(yaxt = 'n', ylim = c(0,ceiling(max(d$logp)))))
+      if (suggestiveline <= lower | upper <= suggestiveline) {
+        suggestiveline <- ifelse(suggestiveline > upper, suggestiveline-size, suggestiveline)
+      } else {
+        suggestiveline <- FALSE
+      }
+      if (genomewideline <= lower | upper <= genomewideline) {
+        genomewideline <- ifelse(genomewideline > upper, genomewideline-size, genomewideline)
+      } else {
+        genomewideline <- FALSE
+      }
+    }
+
     ## And call the plot function passing NA, your ... arguments, and the default
     ## arguments that were not defined in the ... arguments.
     do.call("plot", c(NA, dotargs, def_args[!names(def_args) %in% names(dotargs)]))
@@ -169,6 +193,13 @@ manhattan <- function(x, chr="CHR", bp="BP", p="P", snp="SNP",
         axis(1, at=ticks, labels=labs, ...)
     }
     
+    if (!is.null(axis.y.break)) {
+      print(yat)
+      print(ylab)
+      axis(2, at=yat, labels=ylab)
+      plotrix::axis.break(2, axis.y.break[1])
+    }
+
     # Create a vector of alternatiting colors
     col=rep(col, max(d$CHR))
 
@@ -185,14 +216,17 @@ manhattan <- function(x, chr="CHR", bp="BP", p="P", snp="SNP",
     }
     
     # Add suggestive and genomewide lines
-    if (suggestiveline) abline(h=suggestiveline, col="blue")
-    if (genomewideline) abline(h=genomewideline, col="red")
+    if (suggestiveline) abline(h=suggestiveline, col=suggestiveline_col, lty=suggestiveline_lty)
+    if (genomewideline) abline(h=genomewideline, col=genomewideline_col, lty=genomewideline_lty)
     
     # Highlight snps from a character vector
     if (!is.null(highlight)) {
-        if (any(!(highlight %in% d$SNP))) warning("You're trying to highlight SNPs that don't exist in your results.")
-        d.highlight=d[which(d$SNP %in% highlight), ]
-        with(d.highlight, points(pos, logp, col="green3", pch=20, ...)) 
+        if (!is.list(highlight)) highlight = list(highlight)
+        for (i in 1:length(highlight)) {
+            if (any(!(highlight[[i]] %in% d$SNP))) warning("You're trying to highlight SNPs that don't exist in your results.")
+            d.highlight=d[which(d$SNP %in% highlight[[i]]), ]
+            with(d.highlight, points(pos, logp, col=highlight_col[i], pch=20, ...))
+        }
     }
     
     # Highlight top SNPs
